@@ -17,11 +17,9 @@ data<-list()
 SSIZE=c(25,50,75,100)
 
 seed=readRDS("C:/Users/saha/Desktop/Weighted Regression MED/Seed_Misp.RDS")
-Delta=0.4
 dose=c(0,0.05,0.2,0.6,1)
 model="emax"
-indCfit=0
-indCfitp=0
+
 MED_orig<- f_inverse(Delta+0.32,c( e0=0.32,eMax=0.74,ed50=0.14),model)
 nocl<-detectCores()
 cl<-makeCluster(nocl-1) 
@@ -43,19 +41,18 @@ clusterExport(cl,c("z1","z2","z3","z4","z5","z6","Weighted_MED","f_inverse","gen
 #Segment 1: MED Estimation
 nsim=5000
 Delta=0.4
-seed=sample(1:100000000,nsim)
+#seed=sample(1:100000000,nsim)
 doses <- c(0,0.05,0.2,0.6,1)
 fmodels <- Mods(linear = NULL,linlog=NULL, emax = 0.2,
                 exponential =0.28,sigEmax=c(0.4,4),
                 doses=doses, placEff = 0.2, maxEff = 0.6,
                 addArgs=list(off=0.2))
-#saveRDS(seed,"Seed_Misp.RDS")
-## calculate doses giving an improvement of 0.3 over placebo
+
+## calculate doses giving an improvement of 0.4 over placebo
 MED<-TD(fmodels, Delta=0.4)
 model="emax"
-
-system.time(EstAll<-foreach(s=1:4)%:%
-              foreach(i=1:nsim,.combine="rbind")%dopar% { 
+s=1
+system.time(EstAll<-foreach(i=1:nsim,.combine="rbind")%dopar% { 
                 set.seed(seed[i])
                 data=MCPMod::genDFdata(model, fmodels[[model]], doses, SSIZE[s],0.65)
                 fit<-DoseFinding::fitMod(dose,resp,data,model=model,bnds=defBnds(1)[[model]],addArgs = list(off=0.2))
@@ -76,13 +73,12 @@ system.time(EstAll<-foreach(s=1:4)%:%
                 return(MEDest)
               })
 
-for(s in 1:4)
-{
+
 WeightsInd<-"MED_Fitted"
 weights=c("weights1","weights2","weights3","weights4","weights5","weights6")
 for(i in 1:length(weights))
   WeightsInd<-c(WeightsInd,paste("MED_Weight",i,sep=""))
-MED_Simulation=EstAll[[s]]
+MED_Simulation=EstAll
 MED_Actual<-f_inverse(0.2+Delta, c( e0=0.2,eMax=0.7,ed50=0.2),model="emax")
 colnames(MED_Simulation)=WeightsInd
 rownames(MED_Simulation)=1:nsim
@@ -106,13 +102,12 @@ stable.p <- ggtexttable(R_i,rows=NULL, theme = ttheme(colnames.style = colnames_
 text.p <- ggparagraph(text = "Relative Devation MED(R_i)=(MED_est-MED_actual)/MED_actual", face = "italic", size = 12, color = "black")
 r1<-ggpar(p10,orientation="horizontal", main = "Simulated From: emax",font.main = c(10,"bold.italic", "red"),font.x = c(8, "bold", "#2E9FDF"),font.y = c(8, "bold", "#E7B800"),font.xtickslab = 8,font.ytickslab=8)
 grid.arrange(r1,stable.p,nrow=2,as.table=TRUE,heights=c(6,6))
-}
+
 
 #SigEmax Model
 model="sigEmax"
 
-system.time(EstAll_SigEmax<-foreach(s=1:4)%:%
-              foreach(i=1:nsim,.combine="rbind")%dopar% { 
+system.time(EstAll_SigEmax<- foreach(i=1:nsim,.combine="rbind")%dopar% { 
                 set.seed(seed[i])
                 data=MCPMod::genDFdata(model, fmodels[[model]], doses, SSIZE[s],0.65)
                 fit<-DoseFinding::fitMod(dose,resp,data,model=model,bnds=defBnds(1)[[model]],addArgs = list(off=0.2))
@@ -132,13 +127,12 @@ system.time(EstAll_SigEmax<-foreach(s=1:4)%:%
                 MEDest<-c(MED_est0,MED_est1,MED_est2,MED_est3,MED_est4,MED_est5,MED_est6)
                 return(MEDest)
               })
-for(s in 1:4)
-{
+
   WeightsInd<-"MED_Fitted"
   weights=c("weights1","weights2","weights3","weights4","weights5","weights6")
   for(i in 1:length(weights))
     WeightsInd<-c(WeightsInd,paste("MED_Weight",i,sep=""))
-  MED_Simulation=EstAll[[s]]
+  MED_Simulation=EstAll_SigEmax
   MED_Actual<-f_inverse(0.2+Delta, c( e0=0.2,eMax=0.66,ed50=0.4,h=4),model=model)
   colnames(MED_Simulation)=WeightsInd
   rownames(MED_Simulation)=1:nsim
@@ -162,4 +156,4 @@ for(s in 1:4)
   text.p <- ggparagraph(text = "Relative Devation MED(R_i)=(MED_est-MED_actual)/MED_actual", face = "italic", size = 12, color = "black")
   r1<-ggpar(p10,orientation="horizontal", main = "Simulated From: sigEmax",font.main = c(10,"bold.italic", "red"),font.x = c(8, "bold", "#2E9FDF"),font.y = c(8, "bold", "#E7B800"),font.xtickslab = 8,font.ytickslab=8)
   grid.arrange(r1,stable.p,nrow=2,as.table=TRUE,heights=c(6,6))
-}
+
